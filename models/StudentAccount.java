@@ -7,14 +7,10 @@ import java.util.List;
 public class StudentAccount{
     
     //اجباري
-    private String id;
-    private String fullName;
-    private String email;
+    private String id, fullName, email;
     //اختياري
 
-    private String phone;
-    private String level;
-    private String major;
+    private String phone, level, major;
     private Boolean scholship;
     private List<String> courses;
 
@@ -40,6 +36,15 @@ public class StudentAccount{
     public Boolean getscholship(){return this.scholship;}
     public List<String> getcourses(){return Collections.unmodifiableList(courses);}
 
+    //setting
+    public void setid(String id){this.id = id;}
+    public void setfullName(String fullName){this.fullName = fullName;}
+    public void setemail(String email){ this.email = email;}
+    public void setphone(String phone){ this.phone = phone;}
+    public void setlevel(String level){ this.level = level;}
+    public void setmajor(String major){ this.major = major;}
+    public void setscholship(Boolean scholship){this.scholship = scholship;}
+    public void setcourses(String course){courses.add(course);}
 
     //builder
     public static class StudentAccountBuilder {
