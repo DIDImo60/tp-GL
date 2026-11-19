@@ -8,8 +8,10 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
-// Pattern: View / UI Layer interacting with Builder & Singleton
+// Pattern: View / UI Layer interacting with Builder, Singleton & Prototype
 public class mainFrame extends JFrame {
 
     // حقول الإدخال
@@ -25,12 +27,16 @@ public class mainFrame extends JFrame {
     private final StudentRepository repository = StudentRepository.getInstance();
     private final AuditLogger logger = AuditLogger.getInstance();
 
+    // سجل قوالب الدفعات (Prototype Registry)
+    private final Map<String, StudentAccount> prototypes = new HashMap<>();
+
     public mainFrame() {
         setTitle("نظام إدارة حسابات الطلبة - UniAccounts (TP1)");
-        setSize(900, 600);
+        setSize(950, 620);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setLocationRelativeTo(null); // توسيط النافذة
+        setLocationRelativeTo(null);
         setLayout(new BorderLayout(10, 10));
+
 
         // 1. بناء لوحة الإدخال
         add(createFormPanel(), BorderLayout.EAST);
@@ -41,56 +47,75 @@ public class mainFrame extends JFrame {
         // 3. بناء لوحة سجل التدقيق (أسفل)
         add(createLogPanel(), BorderLayout.SOUTH);
 
-        logToUI("تم تشغيل الواجهة الرسومية بنجاح.");
+        logToUI("تم تشغيل الواجهة الرسومية وتجهيز قوالب Prototype بنجاح.");
     }
 
+
     private JPanel createFormPanel() {
-        JPanel panel = new JPanel(new GridLayout(9, 2, 5, 8));
-        panel.setBorder(BorderFactory.createTitledBorder("إنشاء حساب جديد (Builder)"));
-        panel.setPreferredSize(new Dimension(340, 0));
+        JPanel mainSidePanel = new JPanel(new BorderLayout(5, 10));
+        mainSidePanel.setPreferredSize(new Dimension(360, 0));
 
-        panel.add(new JLabel("رقم التسجيل (ID) *:"));
+        // لوحة الحقول
+        JPanel fieldsPanel = new JPanel(new GridLayout(8, 2, 5, 8));
+        fieldsPanel.setBorder(BorderFactory.createTitledBorder("بيانات الحساب"));
+
+        fieldsPanel.add(new JLabel("رقم التسجيل (ID) *:"));
         txtId = new JTextField();
-        panel.add(txtId);
+        fieldsPanel.add(txtId);
 
-        panel.add(new JLabel("الاسم الكامل *:"));
+        fieldsPanel.add(new JLabel("الاسم الكامل *:"));
         txtName = new JTextField();
-        panel.add(txtName);
+        fieldsPanel.add(txtName);
 
-        panel.add(new JLabel("البريد الإلكتروني *:"));
+        fieldsPanel.add(new JLabel("البريد الإلكتروني *:"));
         txtEmail = new JTextField();
-        panel.add(txtEmail);
+        fieldsPanel.add(txtEmail);
 
-        panel.add(new JLabel("رقم الهاتف:"));
+        fieldsPanel.add(new JLabel("رقم الهاتف:"));
         txtPhone = new JTextField();
-        panel.add(txtPhone);
+        fieldsPanel.add(txtPhone);
 
-        panel.add(new JLabel("المستوى الدراسي:"));
+        fieldsPanel.add(new JLabel("المستوى الدراسي:"));
         cmbLevel = new JComboBox<>(new String[]{"L1", "L2", "L3", "M1", "M2"});
-        panel.add(cmbLevel);
+        fieldsPanel.add(cmbLevel);
 
-        panel.add(new JLabel("التخصص:"));
+        fieldsPanel.add(new JLabel("التخصص:"));
         txtMajor = new JTextField();
-        panel.add(txtMajor);
+        fieldsPanel.add(txtMajor);
 
-        panel.add(new JLabel("مستفيد من منحة؟:"));
+        fieldsPanel.add(new JLabel("مستفيد من منحة؟:"));
         chkScholarship = new JCheckBox("نعم");
-        panel.add(chkScholarship);
+        fieldsPanel.add(chkScholarship);
 
-        panel.add(new JLabel("المقررات (مفصولة بفاصلة):"));
+        fieldsPanel.add(new JLabel("المقررات (مفصولة بفاصلة):"));
         txtCourses = new JTextField();
-        panel.add(txtCourses);
+        fieldsPanel.add(txtCourses);
 
-        JButton btnCreate = new JButton("إضافة الحساب");
+        // لوحة الأزرار (Builder + Singleton + Prototype)
+        JPanel buttonsPanel = new JPanel(new GridLayout(2, 2, 5, 5));
+        buttonsPanel.setBorder(BorderFactory.createTitledBorder("العمليات والأنماط"));
+
+        JButton btnCreate = new JButton("إضافة");
         btnCreate.addActionListener(e -> handleCreateAccount());
-        
+
         JButton btnSearch = new JButton("بحث بـ ID");
         btnSearch.addActionListener(e -> handleSearchAccount());
 
-        panel.add(btnCreate);
-        panel.add(btnSearch);
+        JButton btnSaveProto = new JButton("حفظ كقالب");
+        btnSaveProto.addActionListener(e -> handleSavePrototype());
 
-        return panel;
+        JButton btnCloneProto = new JButton("استنساخ قالب");
+        btnCloneProto.addActionListener(e -> handleClonePrototype());
+
+        buttonsPanel.add(btnCreate);
+        buttonsPanel.add(btnSearch);
+        buttonsPanel.add(btnSaveProto);
+        buttonsPanel.add(btnCloneProto);
+
+        mainSidePanel.add(fieldsPanel, BorderLayout.CENTER);
+        mainSidePanel.add(buttonsPanel, BorderLayout.SOUTH);
+
+        return mainSidePanel;
     }
 
     private JScrollPane createTablePanel() {
@@ -111,58 +136,123 @@ public class mainFrame extends JFrame {
         return scrollPane;
     }
 
-    // منطق إنشاء الحساب عند الضغط على الزر
+    // 1. منطق إنشاء الحساب عبر Builder
     private void handleCreateAccount() {
         try {
-            if (txtId.getText() == null || txtId.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException("رقم التسجيل (id) لا يجب أن يكون فارغاً");
-            }
-            if (txtName.getText() == null || txtName.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException("الاسم الكامل (fullName) لا يجب أن يكون فارغاً");
-            }
-            if (txtEmail.getText() == null || !txtEmail.getText().contains("@")) {
-                throw new IllegalArgumentException("البريد الإلكتروني (email) يجب أن يحتوي على الرمز @");
-            }
-            // استخدام نمط Builder
-            StudentAccount.StudentAccountBuilder builder = new StudentAccount.StudentAccountBuilder(
+            StudentAccount account = buildAccountFromFields(
                     txtId.getText().trim(),
                     txtName.getText().trim(),
                     txtEmail.getText().trim()
             );
 
-            if (!txtPhone.getText().trim().isEmpty()) {
-                builder.phone(txtPhone.getText().trim());
-            }
-            builder.level((String) cmbLevel.getSelectedItem());
-            
-            if (!txtMajor.getText().trim().isEmpty()) {
-                builder.major(txtMajor.getText().trim());
-            }
-            builder.scholship(chkScholarship.isSelected());
-
-            if (!txtCourses.getText().trim().isEmpty()) {
-                builder.courses(Arrays.asList(txtCourses.getText().split(",")));
-            }
-
-            StudentAccount account = builder.build();
-
-            // الحفظ في Singleton Repository
             if (repository.addAccount(account)) {
                 refreshTable();
                 clearFields();
-                logToUI("تم إنشاء وحفظ الحساب: " + account.getid() + " - " + account.getfullName());
+                logToUI("تم إنشاء وحفظ الحساب (Builder): " + account.getid() + " - " + account.getfullName());
             } else {
                 JOptionPane.showMessageDialog(this, "رقم التسجيل موجود مسبقاً!", "خطأ تكرار", JOptionPane.ERROR_MESSAGE);
                 logToUI("فشل الإضافة: رقم التسجيل مكرر (" + account.getid() + ")");
             }
-
         } catch (IllegalArgumentException ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), "خطأ في البيانات", JOptionPane.WARNING_MESSAGE);
             logToUI("خطأ إدخال: " + ex.getMessage());
         }
     }
 
-    // منطق البحث عن طالب
+    // 2. منطق حفظ الإعدادات الحالية كقالب جديد (Prototype)
+    private void handleSavePrototype() {
+        String protoName = JOptionPane.showInputDialog(this, "أدخل اسماً للقالب (مثلاً: دفعة M1 شبكات):");
+        if (protoName != null && !protoName.trim().isEmpty()) {
+            // نبني القالب ببيانات افتراضية للهوية ونأخذ المستوى والتخصص والمقررات من الحقول
+            StudentAccount template = buildAccountFromFields("TEMPLATE", "قالب", "template@univ.dz");
+            prototypes.put(protoName.trim(), template);
+            logToUI("تم حفظ قالب جديد في Prototype Registry باسم: " + protoName.trim());
+            JOptionPane.showMessageDialog(this, "تم حفظ القالب بنجاح! يمكنك الآن استنساخه للطلبة.");
+        }
+    }
+
+    // 3. منطق استنساخ حساب جديد من قالب موجود (Prototype Clone)
+    private void handleClonePrototype() {
+        if (prototypes.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "لا توجد قوالب محفوظة حالياً.");
+            return;
+        }
+
+        // اختيار القالب من قائمة منسدلة
+        Object[] protoNames = prototypes.keySet().toArray();
+        String selectedProto = (String) JOptionPane.showInputDialog(
+                this,
+                "اختر قالب الدفعة المراد استنساخه:",
+                "استنساخ من قالب (Prototype)",
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                protoNames,
+                protoNames[0]
+        );
+
+        if (selectedProto == null) return;
+
+        // طلب البيانات الفريدة للطالب الجديد فقط
+        JTextField newIdField = new JTextField();
+        JTextField newNameField = new JTextField();
+        JTextField newEmailField = new JTextField();
+        Object[] message = {
+                "رقم التسجيل (ID) *:", newIdField,
+                "الاسم الكامل *:", newNameField,
+                "البريد الإلكتروني *:", newEmailField
+        };
+
+        int option = JOptionPane.showConfirmDialog(this, message, "بيانات الطالب الجديد", JOptionPane.OK_CANCEL_OPTION);
+        if (option == JOptionPane.OK_OPTION) {
+            String newId = newIdField.getText().trim();
+            String newName = newNameField.getText().trim();
+            String newEmail = newEmailField.getText().trim();
+
+            if (newId.isEmpty() || newName.isEmpty() || !newEmail.contains("@")) {
+                JOptionPane.showMessageDialog(this, "يرجى إدخال ID واسم وبريد إلكتروني صحيح يحتوي على @", "خطأ", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+
+            // استنساخ الكائن وتعديل هويته فقط!
+            StudentAccount clonedAccount = prototypes.get(selectedProto).clone();
+            clonedAccount.setid(newId);
+            clonedAccount.setfullName(newName);
+            clonedAccount.setemail(newEmail);
+
+            if (repository.addAccount(clonedAccount)) {
+                refreshTable();
+                logToUI("تم استنساخ حساب جديد من القالب [" + selectedProto + "] برقم: " + newId);
+            } else {
+                JOptionPane.showMessageDialog(this, "رقم التسجيل موجود مسبقاً!", "خطأ تكرار", JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    // دالة مساعدة لتجميع البيانات من الحقول عبر Builder
+    private StudentAccount buildAccountFromFields(String id, String name, String email) {
+        if (id.isEmpty()) throw new IllegalArgumentException("رقم التسجيل (id) لا يجب أن يكون فارغاً");
+        if (name.isEmpty()) throw new IllegalArgumentException("الاسم الكامل (fullName) لا يجب أن يكون فارغاً");
+        if (!email.contains("@")) throw new IllegalArgumentException("البريد الإلكتروني (email) يجب أن يحتوي على الرمز @");
+
+        StudentAccount.StudentAccountBuilder builder = new StudentAccount.StudentAccountBuilder(id, name, email);
+
+        if (!txtPhone.getText().trim().isEmpty()) {
+            builder.phone(txtPhone.getText().trim());
+        }
+        builder.level((String) cmbLevel.getSelectedItem());
+
+        if (!txtMajor.getText().trim().isEmpty()) {
+            builder.major(txtMajor.getText().trim());
+        }
+        builder.scholship(chkScholarship.isSelected());
+
+        if (!txtCourses.getText().trim().isEmpty()) {
+            builder.courses(Arrays.asList(txtCourses.getText().split(",")));
+        }
+
+        return builder.build();
+    }
+
     private void handleSearchAccount() {
         String id = JOptionPane.showInputDialog(this, "أدخل رقم التسجيل (ID) للبحث:");
         if (id != null && !id.trim().isEmpty()) {
@@ -176,9 +266,8 @@ public class mainFrame extends JFrame {
         }
     }
 
-    // تحديث الجدول من المستودع
     private void refreshTable() {
-        tableModel.setRowCount(0); // مسح الصفوف القديمة
+        tableModel.setRowCount(0);
         for (StudentAccount acc : repository.getAllAccounts()) {
             tableModel.addRow(new Object[]{
                     acc.getid(),
@@ -192,9 +281,8 @@ public class mainFrame extends JFrame {
         }
     }
 
-    // كتابة الحدث في سجل التدقيق وفي الواجهة معاً
     private void logToUI(String message) {
-        logger.log(message); // الطباعة في الكونسول عبر Singleton
+        logger.log(message);
         txtAuditLog.append(">> " + message + "\n");
     }
 

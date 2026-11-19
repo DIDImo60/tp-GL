@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-public class StudentAccount{
+public class StudentAccount implements Cloneable{
     
     //اجباري
     private String id, fullName, email;
@@ -14,6 +14,7 @@ public class StudentAccount{
     private Boolean scholship;
     private List<String> courses;
 
+    
     //منشئ مع builder
     private StudentAccount (StudentAccountBuilder builder){
         this.id = builder.id;
@@ -25,7 +26,26 @@ public class StudentAccount{
         this.scholship = builder.scholship;
         this.courses = builder.courses;
     }
+    
+    // منشئ خاص يُستخدم للاستنساخ العميق (Deep Copy)
+    private StudentAccount(StudentAccount target) {
+        if (target != null) {
+            this.id = target.id;
+            this.fullName = target.fullName;
+            this.email = target.email;
+            this.phone = target.phone;
+            this.level = target.level;
+            this.major = target.major;
+            this.scholship = target.scholship;
+            this.courses = new ArrayList<>(target.courses);
+        }
+    }
 
+    //colne
+    @Override
+    public StudentAccount clone() {
+        return new StudentAccount(this);
+    }
     //getting
     public String getid(){return this.id;}
     public String getfullName(){return this.fullName;}
@@ -45,6 +65,19 @@ public class StudentAccount{
     public void setmajor(String major){ this.major = major;}
     public void setscholship(Boolean scholship){this.scholship = scholship;}
     public void setcourses(String course){courses.add(course);}
+
+    //اظهار نعلومات على شكل نص
+    @Override
+    public String toString() {
+        return "StudentAccount{" +
+                "id='" + id + '\'' +
+                ", fullName='" + fullName + '\'' +
+                ", email='" + email + '\'' +
+                ", level='" + level + '\'' +
+                ", major='" + major + '\'' +
+                ", courses=" + courses +
+                '}';
+    }
 
     //builder
     public static class StudentAccountBuilder {
